@@ -173,8 +173,8 @@ class UrllibFetcher(BaseFetcher):
 			return r
 
 class HttpFetcher(BaseFetcher):
-	local=threading.local()
 	'''Keep-alive connection supported.'''
+	local=threading.local()
 	def __init__(self,host=None,timeout=None):
 		super().__init__(host,timeout)
 		if self.host is None: raise HostRequired
