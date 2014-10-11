@@ -28,7 +28,6 @@ else:
 	import httplib as client
 	import htmlentitydefs as entities
 
-class LogInError(Exception): pass
 class HostRequired(Exception): pass
 class SameHostRequired(Exception): pass
 class HTTPError(Exception): pass
