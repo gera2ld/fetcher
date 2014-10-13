@@ -5,15 +5,9 @@
 from __future__ import unicode_literals
 import json,logging,threading,io,sys,gzip
 from . import multipart
-from email.message import Message
-if sys.version_info>(3,4):
-	import html
-else:
-	import re
-	if sys.version_info>(3,):
-		unichr=chr
+from email import message
 if sys.version_info>(3,):
-	from urllib import request,parse,error
+	from urllib import request,parse
 	from http import cookiejar,client,cookies
 	from html import entities
 else:
@@ -22,11 +16,34 @@ else:
 	parse.quote=lambda s:urllib.quote(s.encode('utf-8'))
 	parse.unquote=urllib.unquote
 	import urllib2 as request
-	error=request
 	import Cookie as cookies
 	import cookielib as cookiejar
 	import httplib as client
 	import htmlentitydefs as entities
+	chr=unichr
+if sys.version_info>(3,4):
+	from html import unescape
+else:
+	import re
+	def unescape(s):
+		def sub(m):
+			m=m.group(1)
+			if m[0]=='#':
+				if m[1]=='x':	# hex
+					n=int(m[2:],16)
+				elif m[1]=='0':	# oct
+					n=int(m[2:],8)
+				else:			# dec
+					n=int(m[1:])
+				return chr(n)
+			else:
+				c=entities.entitydefs.get(m)
+				if c is None:
+					c='&'+m+';'
+				elif isinstance(c,bytes):	# compatible with Python 2
+					c=unescape(c.decode('latin-1'))
+				return c
+		return re.sub(r'&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);',sub,s)
 
 class HostRequired(Exception): pass
 class SameHostRequired(Exception): pass
@@ -77,30 +94,6 @@ class BaseFetcher:
 		else:
 			ua='Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.153 Safari/537.36 OPR/22.0.1471.70'
 		self.addHeader('User-Agent',ua)
-	if sys.version_info>(3,4):
-		def unescape(self, s):
-			return html.unescape(s)
-	else:
-		def unescape(self, s):
-			def _unescape(m):
-				m=m.group(1)
-				if m[0]=='#':
-					if m[1]=='x':	# hex
-						n=int(m[2:],16)
-					elif m[1]=='0':	# oct
-						n=int(m[2:],8)
-					else:			# dec
-						n=int(m[1:])
-					return unichr(n)
-				else:
-					c=entities.entitydefs.get(m)
-					if c is None:
-						c='&'+m+';'
-					elif isinstance(c,bytes):	# compatible with Python 2
-						c=self.unescape(c.decode('latin-1'))
-					return c
-			if isinstance(s,bytes): s=s.decode(self.encoding)
-			return re.sub(r'&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);',_unescape,s)
 	def save(self, fd, data, charset=None):
 		if isinstance(fd,str):
 			import os
@@ -192,7 +185,7 @@ class HttpFetcher(BaseFetcher):
 			if not isinstance(params,str):
 				params=parse.urlencode(params)
 			url='%s?%s' % (url, params)
-		_headers=Message()
+		_headers=message.Message()
 		# add default headers
 		for i in self.addheaders:
 			_headers[i[0]]=i[1]
