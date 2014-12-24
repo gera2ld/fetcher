@@ -167,13 +167,14 @@ class UrllibFetcher(BaseFetcher):
 class HttpFetcher(BaseFetcher):
 	'''Keep-alive connection supported.'''
 	local=threading.local()
-	def __init__(self,host=None,timeout=None):
+	def __init__(self,host=None,timeout=None,redirect=True):
 		super().__init__(host,timeout)
 		if self.host is None: raise HostRequired
+		self.redirect=redirect
 	def initCookieJar(self,user,domain):
 		self.cookiejar=SimpleCookieJar('%s@%s.cookie' % (parse.quote(user),domain))
 	def open(self, url, data=None, headers={'Connection':'Keep-alive'},
-			params=None, timeout=None, ignore_error=False):
+			params=None, timeout=None, ignore_error=False, redirect=None):
 		loop=getattr(self.local,'loop',0)
 		if loop>200: raise FetcherError('Too many loops.')
 		# Response object
@@ -233,9 +234,12 @@ class HttpFetcher(BaseFetcher):
 		if isinstance(self.cookiejar,SimpleCookieJar):
 			self.cookiejar.save()
 		if r.status>300 and r.status<304:	# redirect
-			l=r.getheader('Location','')
-			self.local.loop=loop+1
-			return self.open(l,timeout=timeout,ignore_error=ignore_error)
+			if redirect is None:
+				redirect=self.redirect
+			if redirect:
+				l=r.getheader('Location','')
+				self.local.loop=loop+1
+				return self.open(l,timeout=timeout,ignore_error=ignore_error)
 		elif not ignore_error and r.status>300:	# error
 			raise HTTPError(r.status)
 		return r
