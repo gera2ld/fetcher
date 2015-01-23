@@ -1,33 +1,17 @@
 #!python
 # coding=utf-8
 # Author: Gerald <gera2ld@163.com>
-# Compatible with Python 2
-from __future__ import unicode_literals
-import json,logging,threading,io,sys,gzip,time
+import json,logging,threading,io,sys,gzip,time,queue
 from . import multipart
-from email import message
-if sys.version_info>(3,):
-	from urllib import request,parse,error
-	from http import cookiejar,client,cookies
-	from html import entities
-	import queue
-else:
-	import urlparse as parse
-	import urllib
-	parse.quote=lambda s:urllib.quote(s.encode('utf-8'))
-	parse.unquote=urllib.unquote
-	import urllib2 as request
-	error=request
-	import Cookie as cookies
-	import cookielib as cookiejar
-	import httplib as client
-	import htmlentitydefs as entities
-	chr=unichr
-	import Queue as queue
+from urllib import request,parse,error
+from http import cookiejar,client
+__all__=['unescape','InvalidJSON','KeepAliveHandler','Fetcher']
+
 if sys.version_info>(3,4):
 	from html import unescape
 else:
 	import re
+	from html import entities
 	def unescape(s):
 		def sub(m):
 			m=m.group(1)
@@ -43,15 +27,10 @@ else:
 				c=entities.entitydefs.get(m)
 				if c is None:
 					c='&'+m+';'
-				elif isinstance(c,bytes):	# compatible with Python 2
-					c=unescape(c.decode('latin-1'))
 				return c
 		return re.sub(r'&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);',sub,s)
 
 class InvalidJSON(Exception): pass
-
-def initLogger(level=logging.NOTSET):
-	logging.basicConfig(level=level,format='%(asctime)s - %(levelname)s: %(message)s')
 
 class KeepAliveHandler(request.HTTPHandler):
 	def __init__(self, timeout=10):
@@ -180,8 +159,7 @@ class Fetcher:
 			g=json.loads(g)
 		except:
 			raise InvalidJSON(g)
-		else:
-			return g
+		return g
 	def getCookie(self, name, default=None):
 		if self.cookiejar:
 			for cookie in self.cookiejar:
