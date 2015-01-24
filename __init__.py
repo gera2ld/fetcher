@@ -49,11 +49,14 @@ class KeepAliveHandler(request.HTTPHandler):
 					con.close()
 				else:
 					break
+			logging.debug('reused connection')
 		except queue.Empty:
 			con=http_class(host, timeout=req.timeout)
+			logging.debug('new connection')
 		return con
 
 	def cache_connection(self, host, con):
+		logging.debug('cached connection')
 		self.cache[host].put_nowait((con,time.time()+self.timeout))
 
 	def do_open(self, http_class, req, **http_conn_args):
@@ -174,7 +177,7 @@ class Fetcher:
 			if not isinstance(params,str):
 				params=parse.urlencode(params)
 			url='%s?%s' % (url, params)
-		req=request.Request(url,None,headers)
+		req=request.Request(url,data,headers)
 		# Build opener
 		handlers=[multipart.MultipartPostHandler]
 		if self.cookiejar is None:
@@ -185,7 +188,7 @@ class Fetcher:
 		if self.addheaders: opener.addheaders=self.addheaders
 		if timeout is None: timeout=self.timeout
 		try:
-			res=opener.open(req,data,timeout=timeout)
+			res=opener.open(req,timeout=timeout)
 		except Exception as e:
 			logging.debug(e)
 			raise e

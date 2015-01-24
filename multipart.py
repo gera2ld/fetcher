@@ -1,13 +1,8 @@
 #!python
 # coding=utf-8
-# Compatible with Python 2
 import os,io,mimetypes,sys
 from email.generator import Generator
-if sys.version_info>(3,):
-	from urllib import request,parse
-else:
-	import urllib as parse
-	import urllib2 as request
+from urllib import request,parse
 
 def multipart_encode(params, files, boundary=None, buf=None, sep=b'\r\n'):
 	if buf is None: buf=[]
@@ -68,18 +63,3 @@ class MultipartPostHandler(request.BaseHandler):
 		# bytes will be ignored
 		return req
 	https_request = http_request
-
-if __name__=="__main__":
-	import tempfile
-	validatorURL = "http://validator.w3.org/check"
-	opener = request.build_opener(MultipartPostHandler)
-	def validateFile(url):
-		temp = tempfile.mkstemp(suffix=".html")
-		os.write(temp[0], opener.open(url).read())
-		params = { "ss" : "0",			# show source
-				   "doctype" : "Inline",
-				   "uploaded_file" : open(temp[1], "rb") }
-		open('c:/users/gerald/1.html','wb').write(opener.open(validatorURL, params).read())
-	if len(sys.argv)>1:
-		for arg in sys.argv[1:]: validateFile(arg)
-	else: validateFile("http://www.baidu.com")
