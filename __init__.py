@@ -6,6 +6,7 @@ from . import multipart
 from urllib import request,parse,error
 from http import cookiejar,client
 __all__=['unescape','InvalidJSON','KeepAliveHandler','Fetcher']
+logger=logging.getLogger(__package__)
 
 if sys.version_info>(3,4):
 	from html import unescape
@@ -49,14 +50,14 @@ class KeepAliveHandler(request.HTTPHandler):
 					con.close()
 				else:
 					break
-			logging.debug('reused connection')
+			logger.debug('reused connection')
 		except queue.Empty:
 			con=http_class(host, timeout=req.timeout)
-			logging.debug('new connection')
+			logger.debug('new connection')
 		return con
 
 	def cache_connection(self, host, con):
-		logging.debug('cached connection')
+		logger.debug('cached connection')
 		self.cache[host].put_nowait((con,time.time()+self.timeout))
 
 	def do_open(self, http_class, req, **http_conn_args):
@@ -190,7 +191,7 @@ class Fetcher:
 		try:
 			res=opener.open(req,timeout=timeout)
 		except Exception as e:
-			logging.debug(e)
+			logger.debug(e)
 			raise e
 		else:
 			if isinstance(self.cookiejar,cookiejar.LWPCookieJar):
