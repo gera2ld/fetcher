@@ -1,5 +1,6 @@
 #!python
 # coding=utf-8
+# Author: Gerald <gera2ld@163.com>
 import os,io,mimetypes,sys
 from email.generator import Generator
 from urllib import request,parse

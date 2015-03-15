@@ -106,7 +106,7 @@ class Fetcher:
 	timeout=10.0
 	cookiejar=None
 	def __init__(self,host=None,timeout=None):
-		self.addheaders=[('Accept-Encoding','gzip')]
+		self.addheaders=[('Accept-Encoding','gzip,deflate')]
 		self.handlers=[
 			KeepAliveHandler(),
 		]
