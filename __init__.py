@@ -7,6 +7,7 @@ from urllib import request,parse,error
 from http import cookiejar,client
 __all__=['unescape','InvalidJSON','KeepAliveHandler','Fetcher']
 logger=logging.getLogger(__package__)
+ENC='utf-8'
 
 if sys.version_info>(3,4):
 	from html import unescape
@@ -31,11 +32,63 @@ else:
 				return c
 		return re.sub(r'&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);',sub,s)
 
+def dump(fd, data, charset=None):
+	if isinstance(fd,str):
+		import os
+		f=open(os.path.expanduser(fd),'wb')
+	else: f=fd
+	if isinstance(data,str): data=data.encode(charset or ENC)
+	if isinstance(data,bytes): f.write(data)
+	else:
+		while True:
+			buf=data.read(self.bufsize)
+			if not buf: break
+			f.write(buf)
+	if f is not fd: f.close()
+
 class InvalidJSON(Exception): pass
 
+class Response:
+	encoding=ENC
+	def __init__(self, response, encoding=None):
+		'''
+		response is a http.client.HTTPResponse object
+		'''
+		self.response=response
+		if encoding is not None:
+			self.encoding=encoding
+		content=response.read()
+		if response.getheader('Content-Encoding')=='gzip':
+			b=io.BytesIO(content)
+			gz=gzip.GzipFile(fileobj=b)
+			content=gz.read()
+		self.content=content
+		self.status=response.status
+		self.reason=response.reason
+
+	def url(self):
+		return self.response.full_url
+
+	def raw(self):
+		return self.content
+
+	def text(self, charset=None):
+		return self.content.decode(charset or self.encoding,'replace')
+
+	def json(self, charset=None):
+		text=self.text(charset)
+		try:
+			obj=json.loads(text)
+		except:
+			raise InvalidJSON(text)
+		return obj
+
 class KeepAliveHandler(request.HTTPHandler):
-	def __init__(self, timeout=10):
-		self.timeout=timeout
+	timeout=10
+
+	def __init__(self, timeout=None):
+		if timeout is not None:
+			self.timeout=timeout
 		self.cache={}
 
 	def get_connection(self, host, http_class, req):
@@ -99,29 +152,35 @@ class KeepAliveHandler(request.HTTPHandler):
 		return r
 
 class Fetcher:
-	encoding='utf-8'
 	scheme='http'
 	user=None
 	bufsize=8192
 	host=None
 	timeout=10.0
 	cookiejar=None
-	def __init__(self,host=None,timeout=None):
+
+	def __init__(self,host=None,timeout=None,keepAliveTimeout=None):
 		self.addheaders=[('Accept-Encoding','gzip,deflate')]
 		self.handlers=[
-			KeepAliveHandler(),
+			KeepAliveHandler(keepAliveTimeout),
+			multipart.MultipartPostHandler,
 		]
 		self.host=host
 		if timeout is not None: self.timeout=timeout
+
 	def __str__(self):
 		return '%s:%s' % (type(self).__name__,self.user)
+
 	def initCookieJar(self, user, domain):
 		self.cookiejar=cookiejar.LWPCookieJar(
 				'%s@%s.lwp' % (parse.quote(user),domain))
 		try: self.cookiejar.load(ignore_discard=True)
 		except: pass
+		self.handlers.append(request.HTTPCookieProcessor(self.cookiejar))
+
 	def addHeader(self,key,val):
 		self.addheaders.append((key,val))
+
 	def addUA_Opera(self,ver=None):
 		if ver: ver=ver.lower()
 		if ver in ('p','presto'):
@@ -129,63 +188,21 @@ class Fetcher:
 		else:
 			ua='Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36 OPR/26.0.1656.60'
 		self.addHeader('User-Agent',ua)
-	def save(self, fd, data, charset=None):
-		if isinstance(fd,str):
-			import os
-			f=open(os.path.expanduser(fd),'wb')
-		else: f=fd
-		if isinstance(data,str): data=data.encode(charset or self.encoding)
-		if isinstance(data,bytes): f.write(data)
-		else:
-			while True:
-				buf=data.read(self.bufsize)
-				if not buf: break
-				f.write(buf)
-		if f is not fd: f.close()
-	def loadRawBinary(self, *k, **kw):
-		r=self.open(*k, **kw)
-		g=r.read()
-		return r,g
-	def loadBinary(self,*k,**kw):
-		r,g=self.loadRawBinary(*k,**kw)
-		if r.getheader('Content-Encoding')=='gzip':
-			b=io.BytesIO(g)
-			gz=gzip.GzipFile(fileobj=b)
-			g=gz.read()
-		return g
-	def load(self, *k, **kw):
-		charset=kw.pop('charset',None)
-		g=self.loadBinary(*k, **kw)
-		return g.decode(charset or self.encoding,'replace')
-	def loadJSON(self, *k, **kw):
-		g=self.load(*k, **kw)
-		try:
-			g=json.loads(g)
-		except:
-			raise InvalidJSON(g)
-		return g
-	def getCookie(self, name, default=None):
-		if self.cookiejar:
-			for cookie in self.cookiejar:
-				if cookie.name==name:
-					return cookie.value
-		return default
-	def open(self, url, data=None, headers={}, params=None, timeout=None):
+
+	def fetch(self, url, data=None, headers={}, params=None, timeout=None):
 		if self.host:
 			url=parse.urljoin(self.scheme+'://'+self.host,url)
 		# Response object
 		if params:
 			if not isinstance(params,str):
 				params=parse.urlencode(params)
-			url='%s?%s' % (url, params)
+			url+='?'+params
 		req=request.Request(url,data,headers)
 		# Build opener
-		handlers=[multipart.MultipartPostHandler]
 		if self.cookiejar is None:
 			self.cookiejar=cookiejar.CookieJar()
-		handlers.append(request.HTTPCookieProcessor(self.cookiejar))
-		handlers.extend(self.handlers)
-		opener=request.build_opener(*handlers)
+			self.handlers.append(request.HTTPCookieProcessor(self.cookiejar))
+		opener=request.build_opener(*self.handlers)
 		if self.addheaders: opener.addheaders=self.addheaders
 		if timeout is None: timeout=self.timeout
 		try:
@@ -196,4 +213,11 @@ class Fetcher:
 		else:
 			if isinstance(self.cookiejar,cookiejar.LWPCookieJar):
 				self.cookiejar.save(ignore_discard=True)
-			return res
+			return Response(res)
+
+	def getCookie(self, name, default=None):
+		if self.cookiejar:
+			for cookie in self.cookiejar:
+				if cookie.name==name:
+					return cookie.value
+		return default
