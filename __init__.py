@@ -83,6 +83,9 @@ class Response:
 			raise InvalidJSON(text)
 		return obj
 
+	def dump(self, fd):
+		dump(fd, self.raw())
+
 class KeepAliveHandler(request.HTTPHandler):
 	timeout=10
 
