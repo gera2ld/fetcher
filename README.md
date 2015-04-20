@@ -20,12 +20,13 @@ print(res.status)
 print(res.reason)
 
 # get binary
-print(res.raw())
+print(res.raw)
 
 # get text
-print(res.text())
-# get text with specified charset
-print(res.text(charset='utf-8'))
+print(res.text)
+# get text with specified encoding
+res.encoding = 'utf-8'
+print(res.text)
 
 # get json
 print(res.json())
@@ -33,5 +34,5 @@ print(res.json())
 # save response to a file
 res.dump('response.html')
 # or
-fetcher.dump('response.html', res.raw())
+fetcher.dump('response.html', res.raw)
 ```
