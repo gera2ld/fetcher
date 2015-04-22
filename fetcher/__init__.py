@@ -57,7 +57,7 @@ class Response:
 		'''
 		response is a http.client.HTTPResponse object
 		'''
-		self.response = response
+		self.__response = response
 		content = response.read()
 		if response.getheader('Content-Encoding') == 'gzip':
 			b = io.BytesIO(content)
@@ -67,21 +67,25 @@ class Response:
 		m = re.search(';\s*charset\s*=\s*(\S+)', contenttype, re.I)
 		if m:
 			self.encoding = m.group(1)
-		self.content = content
+		self.__content = content
 		self.status = response.status
 		self.reason = response.reason
 
 	@property
-	def url(self):
-		return self.response.full_url
+	def raw(self):
+		return self.__response
 
 	@property
-	def raw(self):
-		return self.content
+	def url(self):
+		return self.__response.full_url
+
+	@property
+	def content(self):
+		return self.__content
 
 	@property
 	def text(self):
-		return self.content.decode(self.encoding, 'replace')
+		return self.__content.decode(self.encoding, 'replace')
 
 	def json(self):
 		text = self.text
@@ -91,7 +95,7 @@ class Response:
 			raise InvalidJSON(text)
 
 	def dump(self, fd):
-		dump(fd, self.raw())
+		dump(fd, self.__content)
 
 class KeepAliveHandler(request.HTTPHandler):
 	timeout = 10
