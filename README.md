@@ -2,6 +2,10 @@ fetcher
 ===
 requires: Python 3
 
+Features
+---
+* Support Keep-Alive connections.
+
 Installation
 ---
 Install the package:

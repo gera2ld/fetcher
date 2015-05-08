@@ -172,7 +172,7 @@ class Fetcher:
 	timeout = 10.0
 	cookiejar = None
 
-	def __init__(self, host = None, timeout = None, keepAliveTimeout = None):
+	def __init__(self, host = None, scheme = None, timeout = None, keepAliveTimeout = None):
 		'''
 		host is the default host to use when no host is assigned.
 		>>> fet = Fetcher('www.baidu.com')
@@ -184,6 +184,8 @@ class Fetcher:
 			multipart.MultipartPostHandler,
 		]
 		self.host = host
+		if scheme:
+			self.scheme = scheme
 		if timeout is not None:
 			self.timeout = timeout
 
@@ -195,7 +197,7 @@ class Fetcher:
 		Initiate a LWPCookieJar saved in {user}@{domain}.lwp
 		'''
 		self.cookiejar = cookiejar.LWPCookieJar(
-				'%s@%s.lwp' % (parse.quote(user), domain))
+				'%s@%s.lwp' % (parse.quote_plus(user), domain))
 		try:
 			self.cookiejar.load(ignore_discard = True)
 		except:
